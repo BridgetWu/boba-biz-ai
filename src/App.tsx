@@ -9,7 +9,7 @@ import {
   saveSiteConfig,
 } from "./siteConfigStorage";
 import { TeaShopPreview } from "./TeaShopPreview";
-import type { HeroStyle, SiteConfig } from "./types";
+import type { HeroStyle, SiteConfig, MenuItem } from "./types";
 
 const STEPS = [
   "Welcome",
@@ -45,22 +45,24 @@ const MENUS: { id: keyof typeof MENU_PRESETS; title: string; desc: string }[] =
       title: "Night-market classics",
       desc: "Pearl blacks, Okinawa swirl, savory popcorn chicken staples.",
     },
-    {
-      id: "wellness",
-      title: "Fruit & yogurt bar",
-      desc: "Yakult green teas, sparklers, botanical fruit layers.",
-    },
-    {
-      id: "spice",
-      title: "Tiger Thai & salted caps",
-      desc: "Brown-sugar tiger, Thai red teas, salted-cream pours.",
-    },
   ];
+
+const SWEETNESS_PRESETS = ["0%", "25%", "50%", "75%", "100%"] as const;
+const TOPPING_PRESETS = [
+  "Boba pearls",
+  "Pudding",
+  "Lychee jelly",
+  "Aloe vera",
+  "Grass jelly",
+  "Cheese foam",
+] as const;
 
 export default function App() {
   const [step, setStep] = useState(0);
   const [config, setConfig] = useState<SiteConfig>(defaultSiteConfig);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [customSweetness, setCustomSweetness] = useState("");
+  const [customTopping, setCustomTopping] = useState("");
 
   const headline = useMemo(
     () => buildWelcomeHeadline(config),
@@ -94,7 +96,7 @@ export default function App() {
 
   const publishSite = useCallback(() => {
     saveSiteConfig(config);
-    window.open(getPublishedSiteUrl(config), "_blank", "noopener,noreferrer");
+    window.location.assign(getPublishedSiteUrl(config));
   }, [config]);
 
   const copySiteLink = useCallback(async () => {
@@ -108,6 +110,57 @@ export default function App() {
       window.prompt("Copy your site link:", url);
     }
   }, [config]);
+
+  const handleMenuItemUpdate = useCallback((updatedItem: MenuItem) => {
+    setConfig((c) => ({
+      ...c,
+      menuItems: c.menuItems.map((item) =>
+        item.id === updatedItem.id ? updatedItem : item
+      ),
+    }));
+  }, []);
+
+  const addMenuItem = useCallback((category: MenuItem["category"] = "signature") => {
+    const id = `custom-${Date.now()}`;
+    setConfig((c) => ({
+      ...c,
+      menuItems: [
+        ...c.menuItems,
+        {
+          id,
+          name: "New menu item",
+          description: "Tap to edit description",
+          price: "$0.00",
+          category,
+        },
+      ],
+    }));
+  }, []);
+
+  const toggleOption = useCallback(
+    (key: "sweetnessOptions" | "toppingOptions", value: string) => {
+      setConfig((c) => {
+        const existing = c[key];
+        const next = existing.includes(value)
+          ? existing.filter((v) => v !== value)
+          : [...existing, value];
+        return { ...c, [key]: next };
+      });
+    },
+    [],
+  );
+
+  const addCustomOption = useCallback(
+    (key: "sweetnessOptions" | "toppingOptions", rawValue: string) => {
+      const value = rawValue.trim();
+      if (!value) return;
+      setConfig((c) => {
+        if (c[key].includes(value)) return c;
+        return { ...c, [key]: [...c[key], value] };
+      });
+    },
+    [],
+  );
 
   const monthlyPrice = 29;
   const yearlyPrice = 249;
@@ -283,6 +336,20 @@ export default function App() {
                     placeholder="A short line guests see first"
                   />
                 </div>
+                <div className="app__field">
+                  <label className="app__label" htmlFor="promo">
+                    Top promo message
+                  </label>
+                  <input
+                    id="promo"
+                    className="app__input"
+                    value={config.promoMessage}
+                    onChange={(e) =>
+                      setConfig({ ...config, promoMessage: e.target.value })
+                    }
+                    placeholder="Offer text shown in the top bar"
+                  />
+                </div>
                 <div className="app__aiRow">
                   <button
                     type="button"
@@ -358,6 +425,13 @@ export default function App() {
                     );
                   })}
                 </div>
+                <button
+                  type="button"
+                  className="app__btn app__btn--ghost"
+                  onClick={() => addMenuItem("signature")}
+                >
+                  + Add menu item
+                </button>
               </>
             )}
 
@@ -369,6 +443,19 @@ export default function App() {
                   the order section.
                 </p>
                 <div className="app__rows">
+                  <label className="app__check">
+                    <input
+                      type="checkbox"
+                      checked={config.isDeliveryEnabled}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          isDeliveryEnabled: e.target.checked,
+                        })
+                      }
+                    />
+                    Enable Online Delivery
+                  </label>
                   <label className="app__check">
                     <input
                       type="checkbox"
@@ -418,6 +505,11 @@ export default function App() {
                     Bottle kits & pantry merch shipping
                   </label>
                 </div>
+                {!config.isDeliveryEnabled ? (
+                  <p className="app__stepHint">
+                    Online ordering is hidden from your public page until this is enabled.
+                  </p>
+                ) : null}
                 {config.delivery.delivery ? (
                   <div className="app__field">
                     <label className="app__label" htmlFor="delnote">
@@ -457,6 +549,80 @@ export default function App() {
                       })
                     }
                   />
+                </div>
+                <div className="app__field">
+                  <span className="app__label">Sweetness presets</span>
+                  <div className="app__chips">
+                    {SWEETNESS_PRESETS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          config.sweetnessOptions.includes(option)
+                            ? "app__chip app__chip--on"
+                            : "app__chip"
+                        }
+                        onClick={() => toggleOption("sweetnessOptions", option)}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="app__aiRow">
+                    <input
+                      className="app__input"
+                      value={customSweetness}
+                      onChange={(e) => setCustomSweetness(e.target.value)}
+                      placeholder="Add custom sweetness option"
+                    />
+                    <button
+                      type="button"
+                      className="app__btn app__btn--ghost"
+                      onClick={() => {
+                        addCustomOption("sweetnessOptions", customSweetness);
+                        setCustomSweetness("");
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+                <div className="app__field">
+                  <span className="app__label">Toppings presets</span>
+                  <div className="app__chips">
+                    {TOPPING_PRESETS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          config.toppingOptions.includes(option)
+                            ? "app__chip app__chip--on"
+                            : "app__chip"
+                        }
+                        onClick={() => toggleOption("toppingOptions", option)}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="app__aiRow">
+                    <input
+                      className="app__input"
+                      value={customTopping}
+                      onChange={(e) => setCustomTopping(e.target.value)}
+                      placeholder="Add custom topping option"
+                    />
+                    <button
+                      type="button"
+                      className="app__btn app__btn--ghost"
+                      onClick={() => {
+                        addCustomOption("toppingOptions", customTopping);
+                        setCustomTopping("");
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -608,7 +774,11 @@ export default function App() {
             </div>
           </div>
           <div className="app__previewFrame">
-            <TeaShopPreview config={config} />
+            <TeaShopPreview
+              config={config}
+              onMenuItemUpdate={handleMenuItemUpdate}
+              onAddMenuItem={addMenuItem}
+            />
           </div>
         </section>
       </div>

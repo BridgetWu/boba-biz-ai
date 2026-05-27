@@ -45,6 +45,8 @@ const DEFAULT_MARKETING_COPY: MarketingCopyByLanguage = {
 export function defaultSiteConfig(): SiteConfig {
   return {
     shopName: "",
+    ownerEmail: "",
+    shopIcon: undefined,
     tagline: "",
     promoMessage: "Free pearl upgrade on your first online order this week",
     localizedPromoMessage: {
@@ -201,6 +203,8 @@ export function migrateSiteConfig(raw: unknown): SiteConfig {
 
   return {
     shopName: typeof r.shopName === "string" ? r.shopName : base.shopName,
+    ownerEmail: typeof r.ownerEmail === "string" ? r.ownerEmail : base.ownerEmail,
+    shopIcon: typeof r.shopIcon === "string" ? r.shopIcon : base.shopIcon,
     tagline: typeof r.tagline === "string" ? r.tagline : base.tagline,
     promoMessage:
       typeof r.promoMessage === "string" ? r.promoMessage : base.promoMessage,

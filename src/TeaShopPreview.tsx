@@ -20,6 +20,13 @@ interface PaymentForm {
   cvv: string;
 }
 
+interface ContactForm {
+  firstName: string;
+  lastName: string;
+  email: string;
+  message: string;
+}
+
 function parsePrice(price: string): number {
   const numeric = Number.parseFloat(price.replace(/[^\d.]/g, ""));
   return Number.isFinite(numeric) ? numeric : 0;
@@ -86,6 +93,15 @@ const UI_COPY: Record<LanguageCode, Record<string, string>> = {
     delete: "Delete",
     addSection: "+ Add menu section",
     nonDrinkMessage: "This item is marked as non-drink, so drink customizations are hidden.",
+    contactTitle: "Contact us",
+    contactSub: "Send a message directly to the shop owner.",
+    firstName: "First name",
+    lastName: "Last name",
+    email: "Email",
+    message: "Message",
+    send: "Send",
+    ownerEmailMissing: "Owner email is not set yet.",
+    contactSent: "Your message is ready to send in your email app.",
   },
   "zh-Hant": {
     home: "\u9996\u9801",
@@ -123,6 +139,15 @@ const UI_COPY: Record<LanguageCode, Record<string, string>> = {
     delete: "\u522a\u9664",
     addSection: "+ \u65b0\u589e\u83dc\u55ae\u5206\u985e",
     nonDrinkMessage: "\u6b64\u54c1\u9805\u70ba\u975e\u98f2\u54c1\uff0c\u56e0\u6b64\u4e0d\u986f\u793a\u751c\u5ea6\u8207\u914d\u6599\u8a2d\u5b9a\u3002",
+    contactTitle: "\u806f\u7d61\u6211\u5011",
+    contactSub: "\u76f4\u63a5\u50b3\u9001\u8a0a\u606f\u7d66\u5e97\u4e3b\u3002",
+    firstName: "\u540d",
+    lastName: "\u59d3",
+    email: "\u96fb\u5b50\u90f5\u4ef6",
+    message: "\u7559\u8a00",
+    send: "\u9001\u51fa",
+    ownerEmailMissing: "\u5c1a\u672a\u8a2d\u5b9a\u5e97\u4e3b\u96fb\u5b50\u90f5\u4ef6\u3002",
+    contactSent: "\u5df2\u958b\u555f\u90f5\u4ef6\u7a0b\u5f0f\uff0c\u53ef\u4ee5\u76f4\u63a5\u9001\u51fa\u8a0a\u606f\u3002",
   },
 };
 
@@ -219,6 +244,9 @@ export function TeaShopPreview({
   const [payment, setPayment] = useState<PaymentForm>({ cardholderName: "", cardNumber: "", expirationDate: "", cvv: "" });
   const [checkoutError, setCheckoutError] = useState("");
   const [placedOrder, setPlacedOrder] = useState<DeliveryOrder | null>(null);
+  const [contact, setContact] = useState<ContactForm>({ firstName: "", lastName: "", email: "", message: "" });
+  const [contactStatus, setContactStatus] = useState("");
+  const [contactError, setContactError] = useState("");
 
   const grouped = config.menuSections.map((section) => ({ key: section.id, label: section.title, items: config.menuItems.filter((m) => m.sectionId === section.id) }));
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + lineTotal(item), 0), [cart]);
@@ -248,9 +276,30 @@ export function TeaShopPreview({
     setCart([]); setDeliveryAddress(""); setPayment({ cardholderName: "", cardNumber: "", expirationDate: "", cvv: "" });
   };
 
+  const sendContactMessage = () => {
+    setContactStatus("");
+    setContactError("");
+    const ownerEmail = config.ownerEmail.trim();
+    if (!ownerEmail) {
+      setContactError(ui.ownerEmailMissing);
+      return;
+    }
+    if (!contact.firstName.trim() || !contact.lastName.trim() || !contact.email.trim() || !contact.message.trim()) {
+      setContactError(lang === "zh-Hant" ? "\u8acb\u5b8c\u6574\u586b\u5beb\u6240\u6709\u6b04\u4f4d\u3002" : "Please fill out all fields.");
+      return;
+    }
+    const subject = encodeURIComponent(`${contact.firstName.trim()} ${contact.lastName.trim()} - ${shop} contact form`);
+    const body = encodeURIComponent(
+      `First name: ${contact.firstName.trim()}\nLast name: ${contact.lastName.trim()}\nEmail: ${contact.email.trim()}\n\nMessage:\n${contact.message.trim()}`,
+    );
+    window.location.href = `mailto:${ownerEmail}?subject=${subject}&body=${body}`;
+    setContactStatus(ui.contactSent);
+    setContact({ firstName: "", lastName: "", email: "", message: "" });
+  };
+
   return (<div className={`tsp tsp--${config.themeMode}`} style={siteThemeStyle(config.themeMode, config.accentColor)}>
       <div className="tsp__promo">{config.localizedPromoMessage[lang]}</div>
-      <header className="tsp__nav"><div className="tsp__brand"><span className="tsp__logo" aria-hidden /><div><div className="tsp__name">{shop}</div>{city ? <div className="tsp__city">{city}</div> : null}</div></div>
+      <header className="tsp__nav"><div className="tsp__brand">{config.shopIcon ? <img src={config.shopIcon} alt={shop} className="tsp__logoImage" /> : <span className="tsp__logo" aria-hidden />}<div><div className="tsp__name">{shop}</div>{city ? <div className="tsp__city">{city}</div> : null}</div></div>
         <nav className="tsp__links" aria-label="Primary"><a href="#home">{ui.home}</a><a href="#menu" className="tsp__linkAccent">{ui.menu}</a>{config.isDeliveryEnabled ? <a href="#delivery" className="tsp__linkCta">{ui.delivery}</a> : null}{onLanguageToggle ? <button type="button" className="tsp__langToggle" onClick={onLanguageToggle}>{lang === "en" ? "EN / \u7e41" : "\u7e41 / EN"}</button> : null}</nav>
       </header>
 
@@ -275,6 +324,8 @@ export function TeaShopPreview({
               <div className="tsp__row2"><div><label className="tsp__fieldLabel" htmlFor="exp">{ui.expirationDate}</label><input id="exp" className="tsp__input" inputMode="numeric" value={payment.expirationDate} onChange={(e) => setPayment((prev) => ({ ...prev, expirationDate: maskExpDate(e.target.value) }))} placeholder="MM/YY" /></div><div><label className="tsp__fieldLabel" htmlFor="cvv">CVV</label><input id="cvv" className="tsp__input" type="password" inputMode="numeric" value={payment.cvv} onChange={(e) => setPayment((prev) => ({ ...prev, cvv: maskCvv(e.target.value) }))} placeholder="123" /></div></div>
               {checkoutError ? <p className="tsp__error">{checkoutError}</p> : null}<button type="button" className="tsp__btn tsp__btn--primary" onClick={placeOrder}>{ui.placeOrder}</button>{placedOrder ? <p className="tsp__success">{ui.orderPlaced} {placedOrder.id} {ui.orderPlacedSuffix} {formatUsd(placedOrder.total)}.</p> : null}
             </div></div></section> : null}
+
+        <section id="contact" className="tsp__section tsp__section--alt"><div className="tsp__sectionHead"><h2 className="tsp__sectionTitle">{ui.contactTitle}</h2><p className="tsp__sectionSub">{ui.contactSub}</p></div><div className="tsp__contactWrap"><div className="tsp__card"><div className="tsp__row2"><div><label className="tsp__fieldLabel" htmlFor="contactFirst">{ui.firstName}</label><input id="contactFirst" className="tsp__input" value={contact.firstName} onChange={(e) => setContact((prev) => ({ ...prev, firstName: e.target.value }))} /></div><div><label className="tsp__fieldLabel" htmlFor="contactLast">{ui.lastName}</label><input id="contactLast" className="tsp__input" value={contact.lastName} onChange={(e) => setContact((prev) => ({ ...prev, lastName: e.target.value }))} /></div></div><label className="tsp__fieldLabel" htmlFor="contactEmail">{ui.email}</label><input id="contactEmail" type="email" className="tsp__input" value={contact.email} onChange={(e) => setContact((prev) => ({ ...prev, email: e.target.value }))} /><label className="tsp__fieldLabel" htmlFor="contactMessage">{ui.message}</label><textarea id="contactMessage" className="tsp__input tsp__textarea" value={contact.message} onChange={(e) => setContact((prev) => ({ ...prev, message: e.target.value }))} rows={5} />{contactError ? <p className="tsp__error">{contactError}</p> : null}{contactStatus ? <p className="tsp__success">{contactStatus}</p> : null}<button type="button" className="tsp__btn tsp__btn--primary" onClick={sendContactMessage}>{ui.send}</button></div></div></section>
       </main>
 
       {activeItem ? <div className="tsp__modalBackdrop" role="dialog" aria-modal="true"><div className="tsp__modal"><h3 className="tsp__cardTitle">{ui.customize} {tTerm(lang, activeItem.name)}</h3><p className="tsp__cardBody">{ui.basePrice}: {activeItem.price}</p>
@@ -288,6 +339,7 @@ export function TeaShopPreview({
         .tsp__nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1.25rem; position: sticky; top: 0; background: var(--tsp-nav-bg); color: var(--tsp-nav-ink); z-index: 2; }
         .tsp__brand { display: flex; align-items: center; gap: .65rem; }
         .tsp__logo { width: 2.5rem; height: 2.5rem; border-radius: 999px; background: #0a0a0a; border: 2px solid var(--tsp-accent); display: inline-block; }
+        .tsp__logoImage { width: 2.5rem; height: 2.5rem; border-radius: 999px; border: 2px solid var(--tsp-accent); object-fit: cover; display: inline-block; }
         .tsp__name { font-family: "Fraunces", Georgia, serif; font-weight: 700; font-size: 1rem; color: var(--tsp-accent); text-transform: uppercase; letter-spacing: .04em; }
         .tsp__city { font-size: .78rem; color: var(--tsp-nav-muted); text-transform: uppercase; letter-spacing: .08em; }
         .tsp__links { display: flex; align-items: center; gap: 1.1rem; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
@@ -337,6 +389,8 @@ export function TeaShopPreview({
         .tsp__fieldLabel { display: block; margin: .65rem 0 .25rem; font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
         .tsp__input { width: 100%; font: inherit; border: 1px solid var(--tsp-border); border-radius: .55rem; padding: .55rem .65rem; background: var(--tsp-surface); color: var(--tsp-deep); }
         .tsp__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        .tsp__textarea { resize: vertical; min-height: 7rem; }
+        .tsp__contactWrap { max-width: 42rem; }
         .tsp__error { color: #b42318; font-weight: 600; margin: .75rem 0; }
         .tsp__success { color: #047857; font-weight: 600; margin: .75rem 0 0; }
         .tsp__modalBackdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: grid; place-items: center; padding: 1rem; z-index: 20; }

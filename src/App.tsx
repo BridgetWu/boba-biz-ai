@@ -158,6 +158,10 @@ const UI_TEXT = {
     linkCopied: "Link copied",
     copyLink: "Copy site link",
     selected: "Selected:",
+    ownerEmail: "Owner email",
+    shopIcon: "Shop icon",
+    uploadIcon: "Upload icon",
+    clearIcon: "Use default icon",
   },
   "zh-Hant": {
     shopName: "\u5e97\u540d",
@@ -190,6 +194,10 @@ const UI_TEXT = {
     linkCopied: "\u5df2\u8907\u88fd\u9023\u7d50",
     copyLink: "\u8907\u88fd\u7db2\u7ad9\u9023\u7d50",
     selected: "\u5df2\u9078\u64c7\uff1a",
+    ownerEmail: "\u5e97\u4e3b\u96fb\u5b50\u90f5\u4ef6",
+    shopIcon: "\u5e97\u5bb6\u5716\u793a",
+    uploadIcon: "\u4e0a\u50b3\u5716\u793a",
+    clearIcon: "\u4f7f\u7528\u9810\u8a2d\u5713\u5f62\u5716\u793a",
   },
 } as const;
 
@@ -367,6 +375,20 @@ export default function App() {
   const yearlyPrice = 249;
   const yearlyMonthlyEq = Math.round(yearlyPrice / 12);
 
+  const handleShopIconUpload = useCallback(
+    (file: File | null) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === "string" ? reader.result : "";
+        if (!result) return;
+        setConfig((c) => ({ ...c, shopIcon: result }));
+      };
+      reader.readAsDataURL(file);
+    },
+    [],
+  );
+
   return (
     <div
       className="app"
@@ -457,10 +479,39 @@ export default function App() {
                   />
                 </div>
                 <div className="app__field">
+                  <label className="app__label" htmlFor="ownerEmail">{ui.ownerEmail}</label>
+                  <input
+                    id="ownerEmail"
+                    type="email"
+                    className="app__input"
+                    value={config.ownerEmail}
+                    onChange={(e) =>
+                      setConfig({ ...config, ownerEmail: e.target.value })
+                    }
+                    placeholder="owner@yourshop.com"
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="app__field">
+                  <span className="app__label">{ui.shopIcon}</span>
+                  <input
+                    type="file"
+                    className="app__input"
+                    accept="image/*"
+                    onChange={(e) => handleShopIconUpload(e.target.files?.[0] ?? null)}
+                  />
+                  {config.shopIcon ? (
+                    <button
+                      type="button"
+                      className="app__btn app__btn--ghost"
+                      onClick={() => setConfig((c) => ({ ...c, shopIcon: undefined }))}
+                    >
+                      {ui.clearIcon}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="app__field">
                   <span className="app__label">{copy.siteTheme}</span>
-                  <p className="app__paletteHint">
-                    Like Kung Fu Tea: dark header, light or dark body, bold accent on headlines.
-                  </p>
                   <div className="app__themeToggle" role="group" aria-label="Light or dark site">
                     <button
                       type="button"

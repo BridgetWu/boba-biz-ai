@@ -83,6 +83,8 @@ export interface DeliveryOrder {
 
 export interface SiteConfig {
   shopName: string;
+  ownerEmail: string;
+  shopIcon?: string;
   tagline: string;
   promoMessage: string;
   localizedPromoMessage: Record<LanguageCode, string>;
